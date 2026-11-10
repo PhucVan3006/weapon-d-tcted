@@ -1,0 +1,219 @@
+# ====================================================================
+# CẤU HÌNH MÔ HÌNH - HỆ THỐNG TRINH SÁT PHÁT HIỆN HUNG KHÍ (PTIT)
+# Môn: Phát triển các hệ thống thông minh (PTCHTTM)
+# --------------------------------------------------------------------
+# PHIÊN BẢN v3 - NÂNG KIẾN TRÚC LÊN YOLO26 (họ YOLO mới nhất, 01/2026)
+#
+# VÌ SAO ĐỔI TỪ YOLOv8 SANG YOLO26 (số liệu chính thức Ultralytics, COCO 640px):
+#   mAP50-95 : yolo26n 40.9 | yolo11n 39.5 | yolov8n 37.3
+#              yolo26s 48.6 | yolo11s 47.0 | yolov8s 44.9
+#   CPU ONNX : yolo26n 38.9 ms  (yolo11n 56.1 ms)  -> nhanh hơn ~31%
+#              yolo26s 87.2 ms  (yolo11s 90.0 ms)
+#   Thay đổi kiến trúc có lợi trực tiếp cho đề tài này:
+#     - Bỏ DFL  -> đầu dò gọn hơn, export/ONNX dễ hơn
+#     - STAL (Small-Target-Aware Label Assignment) + ProgLoss
+#       -> tăng khả năng bắt vật thể NHỎ, đúng bài toán dao/súng ở xa
+#          trong khung hình camera giám sát
+#     - Có đầu one-to-one: suy luận KHÔNG CẦN NMS (nms=False), độ trễ
+#       ổn định hơn khi chạy video dài
+#     - Optimizer MuSGD (tuỳ chọn, thay AdamW/SGD)
+#
+# YÊU CẦU: ultralytics >= 8.4.0 (họ yolo26 chỉ có từ bản này).
+#   Kiểm tra bằng:  python src/00_setup/check_env.py
+#   Nếu bản đang cài chưa có yolo26, train.py TỰ ĐỘNG lùi về yolo11s
+#   rồi yolov8s theo danh sách model_fallback bên dưới - không bị crash.
+#
+# LƯU Ý: chạy 'check_env.py --apply' sẽ ghi đè file này bằng yaml.safe_dump
+#        và LÀM MẤT toàn bộ chú thích tiếng Việt. Bản gốc được sao lưu ở
+#        model_config.yaml.bak.
+# ====================================================================
+
+# --- Mô hình nền tảng đang dùng (CẤP TẦM TRUNG) ----------------------
+# yolo26s = bản "small/tầm trung": cân bằng tốt nhất giữa mAP và khả năng
+# chạy được trên máy chỉ có CPU. Xem model_ladder để đổi cấp.
+model_name: yolo26s.pt
+
+# --- Thang mô hình: đổi 1 dòng model_name ở trên là xong -------------
+# ETA dưới đây tính từ SỐ ĐO THẬT trên máy này (AMD Ryzen 7 8745H, CPU):
+#   runs/train/quick_yolo26n = yolo26n @416, batch 8 -> 622 giây/epoch
+# và đã tính tới việc tập train giảm còn ~3.563 ảnh sau khi chia lại
+# (resplit_stratified.py), tức mỗi epoch nhanh hơn khoảng 29%.
+model_ladder:
+  nhe:    yolo26n.pt   # ~2.4M tham số | ~11 phút/epoch @512 | 40 epoch ~ 7,5 giờ
+  trung:  yolo26s.pt   # ~9.5M tham số | ~25 phút/epoch @512 (có freeze) | 40 epoch ~ 17 giờ  <= ĐANG DÙNG
+  nang:   yolo26m.pt   # ~20M tham số  | ~85 phút/epoch | 2-3 ngày, KHÔNG khuyến nghị
+
+# --- Danh sách lùi cấp tự động khi ultralytics chưa hỗ trợ -----------
+# train.py thử lần lượt từ trên xuống, lấy cái đầu tiên tải/nạp được.
+model_fallback:
+  - yolo26s.pt
+  - yolo11s.pt
+  - yolov8s.pt
+
+# --- Gộp mô hình khi đánh giá (tuỳ chọn, dùng ở evaluate.py) ---------
+ensemble_models:
+  - runs/train/weapon_base/weights/best.pt
+  - runs/train/weapon_finetune/weights/best.pt
+
+# ====================================================================
+# GIAI ĐOẠN A - HUẤN LUYỆN NỀN
+# Đóng băng backbone (freeze: 10) để CPU chỉ phải lan truyền ngược phần
+# đầu dò -> tiết kiệm khoảng 35-45% thời gian mỗi epoch mà vẫn tận dụng
+# trọn bộ đặc trưng COCO của yolo26s. Đây là mẹo quan trọng nhất để một
+# mô hình tầm trung vẫn train được trên máy không GPU.
+# ETA: khoảng 17 giờ cho 40 epochs (tính từ số đo thật của máy này).
+# ====================================================================
+training:
+  run_name: weapon_base
+  epochs: 40
+  batch_size: 8
+  imgsz: 512
+  device: 0
+  workers: 4
+  cache: disk
+  resume: false
+  amp: true
+  seed: 0
+  deterministic: true
+
+  # Đóng băng backbone. Đặt 0 để train toàn mạng (GPU RTX 4050 chạy mượt mà).
+  freeze: 0
+
+  optimizer: AdamW
+  lr0: 0.0012
+  lrf: 0.01
+  cos_lr: true
+  momentum: 0.937
+  weight_decay: 0.0005
+  warmup_epochs: 3.0
+  warmup_momentum: 0.8
+  warmup_bias_lr: 0.1
+  patience: 20
+  save_period: 10
+
+  # Trọng số hàm mất mát. YOLO26 đã bỏ DFL nên tham số dfl bị bỏ qua
+  # một cách vô hại; vẫn giữ để tương thích khi lùi về yolo11/yolov8.
+  box: 7.5
+  cls: 0.7
+  dfl: 1.5
+
+  multi_scale: 0.0
+  rect: false
+  close_mosaic: 10
+  dropout: 0.0
+  fraction: 1.0
+
+  augmentations:
+    hsv_h: 0.015
+    hsv_s: 0.7
+    hsv_v: 0.5
+    degrees: 10.0
+    translate: 0.15
+    scale: 0.6
+    shear: 2.0
+    perspective: 0.0005
+    flipud: 0.0
+    fliplr: 0.5
+    mosaic: 1.0
+    mixup: 0.1
+    cutmix: 0.0
+    copy_paste: 0.3
+    erasing: 0.4
+    auto_augment: randaugment
+
+# ====================================================================
+# GIAI ĐOẠN B - TINH CHỈNH THEO DOMAIN CAMERA GIÁM SÁT
+# Mở băng toàn mạng (freeze: 0), learning rate thấp, chạy trên dataset
+# đã mô phỏng đặc trưng CCTV (mờ chuyển động, nén, thiếu sáng).
+# Đây là bước thu hẹp domain gap - nơi mAP thực tế trên video tăng
+# mạnh nhất, dù mAP trên tập Sohas gốc có thể không đổi nhiều.
+# ETA: khoảng 8 giờ cho 12 epochs (không freeze nên mỗi epoch nặng hơn).
+# ====================================================================
+finetune:
+  enabled: true
+  run_name: weapon_finetune
+  base_weights: runs/train/weapon_base/weights/best.pt
+  data_yaml: configs/data_finetune.yaml
+  epochs: 12
+  batch_size: 4
+  imgsz: 512
+  device: 0
+  workers: 4
+  cache: disk
+  amp: true
+  freeze: 0
+  lr0: 0.0002
+  lrf: 0.05
+  optimizer: AdamW
+  cos_lr: true
+  patience: 10
+  close_mosaic: 6
+  box: 7.5
+  cls: 0.7
+  dfl: 1.5
+  augmentations:
+    mosaic: 0.5
+    mixup: 0.0
+    cutmix: 0.0
+    copy_paste: 0.1
+    scale: 0.5
+    degrees: 5.0
+    perspective: 0.0005
+    fliplr: 0.5
+    erasing: 0.2
+
+# ====================================================================
+# SUY LUẬN
+# ====================================================================
+inference:
+  conf_threshold: 0.22
+  iou_threshold: 0.45
+  agnostic_nms: true
+  max_det: 20
+
+  # Nên để bằng imgsz lúc train (512) để không lệch phân bố tỉ lệ vật thể.
+  imgsz: 512
+
+  augment: false
+  half: true
+  target_fps: 30
+
+  # --- Chế độ NMS-free của YOLO26 (đầu one-to-one) ------------------
+  # true  -> truyền nms=False, bỏ hẳn bước NMS: độ trễ ổn định hơn,
+  #          tối đa 300 hộp/ảnh. Chỉ có tác dụng với yolo26 + ultralytics
+  #          đủ mới; các script tự bỏ qua nếu không hỗ trợ.
+  # Để false ở lần chạy đầu để so sánh công bằng với kết quả YOLOv8 cũ,
+  # sau đó bật lên và đo lại FPS cho phần báo cáo.
+  nms_free: false
+
+  temporal:
+    enabled: true
+    tracker: bytetrack.yaml
+    vote_window: 5
+    vote_min_hits: 2
+    max_age: 10
+    ema_alpha: 0.6
+
+# ====================================================================
+# ĐÁNH GIÁ
+# ====================================================================
+evaluation:
+  iou_threshold: 0.5
+  split: test
+  augment: true
+  max_det: 300
+  conf: 0.001
+  plots: true
+  save_json: true
+  threshold_sweep:
+    conf_range:
+      - 0.1
+      - 0.7
+    conf_step: 0.05
+    iou_range:
+      - 0.4
+      - 0.7
+    iou_step: 0.05
+    optimize_for: f1
+
+_applied_preset: cpu_mid

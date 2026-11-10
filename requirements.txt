@@ -1,0 +1,24 @@
+# ultralytics >= 8.4.0 là bắt buộc để có họ kiến trúc YOLO26 (ra 01/2026).
+# Nếu giữ bản cũ hơn, train.py vẫn chạy nhưng tự lùi về yolo11/yolov8.
+ultralytics>=8.4.0
+opencv-python>=4.8.0
+torch>=2.2.0
+torchvision>=0.17.0
+numpy>=1.24.0
+matplotlib>=3.7.0
+pandas>=2.0.0
+seaborn>=0.12.0
+pyyaml>=6.0
+pillow>=9.5.0
+tqdm>=4.65.0
+scipy>=1.10.0
+psutil>=5.9.0
+
+# Giao diện web (app.py). Thiếu gói này thì app.py không chạy được.
+gradio>=4.0.0
+
+# Tầng AI Agent thẩm định bối cảnh (src/agent/security_agent.py).
+# Thiếu hai gói này thì agent im lặng tự tắt: import bị bắt bởi try/except
+# nên KHÔNG có thông báo lỗi, chỉ là tính năng không bao giờ hoạt động.
+google-genai>=0.3.0
+python-dotenv>=1.0.0

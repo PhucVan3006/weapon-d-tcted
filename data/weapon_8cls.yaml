@@ -1,0 +1,17 @@
+# Weapon Detection Dataset - 8 lớp vũ khí thật
+# Sinh bởi rebalance_dataset.py
+#
+# Đã bỏ 4 lớp khỏi bản 12 lớp:
+#   Chain   (32.838 hộp = 64,6% dữ liệu, gây 22% số báo nhầm)
+#   Stick   (19 hộp - không đủ để huấn luyện)
+#   Hammer  (428 hộp)
+#   Spanner (208 hộp)
+# ID lớp 0-7 giữ nguyên nên trọng số cũ vẫn tương thích phần lớn.
+
+path: C:/ptchttm/data/dataset_merged
+train: train/images
+val: valid/images
+test: test/images
+
+nc: 8
+names: ['Axe', 'Sickle', 'Sword', 'Crowbar', 'Knife', 'Pistol', 'Long_gun', 'Grenade']

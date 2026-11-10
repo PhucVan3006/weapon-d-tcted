@@ -1,0 +1,22 @@
+# ====================================================================
+# DATASET GIAI ĐOẠN B - TINH CHỈNH THEO DOMAIN CAMERA GIÁM SÁT
+# Dùng cho bước finetune sau khi đã có best.pt từ huấn luyện nền.
+# --------------------------------------------------------------------
+# Tập này được sinh ra bởi:
+#   python src/01_data_prep/domain_augment.py
+# Nội dung gồm:
+#   - Ảnh gốc Sohas đã qua bộ lọc mô phỏng CCTV (mờ chuyển động, nén,
+#     thiếu sáng, thu nhỏ vật thể)
+#   - Frame trích thủ công từ data/raw_videos/ đã gán nhãn (nếu có)
+# ====================================================================
+
+path: c:/ptchttm/data/dataset_domain
+train: train/images
+val: val/images
+test: test/images
+
+nc: 2
+
+names:
+  0: gun
+  1: knife

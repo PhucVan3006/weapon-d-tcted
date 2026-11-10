@@ -1,0 +1,8 @@
+# Weapon Detection Dataset - Unified 12 Classes
+path: c:/ptchttm/data/dataset_merged
+train: train/images
+val: valid/images
+test: test/images
+
+nc: 12
+names: ['Axe', 'Sickle', 'Sword', 'Crowbar', 'Knife', 'Pistol', 'Long_gun', 'Grenade', 'Stick', 'Hammer', 'Spanner', 'Chain']

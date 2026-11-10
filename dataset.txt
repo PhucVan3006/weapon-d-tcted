@@ -1,0 +1,18 @@
+!pip install roboflow
+
+from roboflow import Roboflow
+rf = Roboflow(api_key="KKBa7oKcSphLvLH9ghje")
+project = rf.workspace("melisa-yildirim-cqde4").project("omnisight-atm-skimmer")
+version = project.version(1)
+dataset = version.download("yolo26")
+
+
+
+!pip install roboflow
+
+from roboflow import Roboflow
+rf = Roboflow(api_key="KKBa7oKcSphLvLH9ghje")
+project = rf.workspace("cvai-vublo").project("weapon-dataset-conversion")
+version = project.version(1)
+dataset = version.download("yolo26")
+                

@@ -1,0 +1,38 @@
+# YOLO Dataset Configuration - HỆ THỐNG TRINH SÁT PHÁT HIỆN HUNG KHÍ
+# Học viện Công nghệ Bưu chính Viễn thông (PTIT)
+
+# Đường dẫn thư mục gốc dataset
+path: c:/ptchttm/data/dataset
+train: train/images
+val: val/images
+test: test/images
+
+# Số lượng phân lớp
+nc: 2
+
+# Tên các nhãn đối tượng
+names:
+  0: gun    # Súng
+  1: knife  # Dao
+
+# ---------------------------------------------------------------------
+# GHI CHÚ
+#
+# Số lượng ảnh của từng tập KHÔNG ghi ở đây, vì nó thay đổi mỗi lần
+# chia lại dataset và rất dễ trở thành thông tin sai. Muốn biết con số
+# hiện tại, chạy:
+#
+#     python src/01_data_prep/audit_dataset.py
+#
+# Script đó đếm ảnh/nhãn từng tập, báo tỉ lệ ảnh nền, mức mất cân bằng
+# lớp và kiểm tra rò rỉ dữ liệu giữa các tập.
+#
+# Nếu phân bố lớp giữa train/val/test lệch nhau (audit sẽ cảnh báo),
+# chia lại có phân tầng bằng:
+#
+#     python src/01_data_prep/resplit_stratified.py --apply
+#
+# Muốn thêm lớp mới (ví dụ Gậy), tăng nc lên 3 và bổ sung:
+#   names:
+#     2: stick
+# ---------------------------------------------------------------------

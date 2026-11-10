@@ -1,0 +1,31 @@
+# Bytecode & Caches
+__pycache__/
+*.py[cod]
+*$py.class
+*.class
+
+# Datasets - Exclude all image/label folders (keep YAML configs)
+data/*/
+data/*.json
+data/*.cache
+data/*.txt
+sohas/
+Claude outputs/
+
+# Local Storage & Processed Outputs
+storage/
+runs/
+*.log
+
+# Heavy or redundant weights (Keep only the production weights/best.pt)
+yolo26s.pt
+weights/best_12cls_old.pt
+weights/yolo26n.pt
+*.pt.bak
+
+# Environment & IDE
+.env
+.idea/
+.vscode/
+*.swp
+*.DS_Store

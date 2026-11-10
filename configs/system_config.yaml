@@ -1,0 +1,274 @@
+# ==============================================================================
+# HỆ THỐNG TRINH SÁT PHÁT HIỆN HUNG KHÍ - CẤU HÌNH HỆ THỐNG
+# Học viện Công nghệ Bưu chính Viễn thông (PTIT)
+#
+# BẢN NÀY ƯU TIÊN: (1) TỶ LỆ BẮT ĐƯỢC (recall - không bỏ sót)
+#                  (2) KHOANH VÙNG CHÍNH XÁC (hộp bao sát vật thể)
+# Mọi thay đổi so với bản trước đều có ghi lý do ngay tại chỗ.
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 1. CHÍNH SÁCH LỚP DÙNG CHUNG (CLASS POLICY)
+# Mọi đường chạy (ảnh, video, camera, web) đều đọc từ đây qua src/common/class_policy.py
+# ------------------------------------------------------------------------------
+class_policy:
+  # Ngưỡng dò sàn truyền vào model.predict().
+  detect_conf_floor: 0.15
+
+  # Phân tầng mức độ nguy hiểm:
+  # - weapon: vũ khí thật, phát cảnh báo đỏ
+  # - suspect: dụng cụ đồ nghề / nghi vấn, chỉ đánh dấu vàng
+  tiers:
+    weapon:
+      - Axe
+      - Sickle
+      - Sword
+      - Knife
+      - Pistol
+      - Long_gun
+      - Grenade
+    suspect:
+      - Crowbar
+      - Stick
+      - Hammer
+      - Spanner
+      - Chain
+
+  # Ngưỡng tin cậy RIÊNG từng lớp (tầng lọc T2).
+  # Đã cân bằng để ngăn chặn việc báo nhầm kiếm/mã tấu lên nòng súng, báng súng.
+  thresholds:
+    default: 0.30
+    Pistol: 0.18
+    Long_gun: 0.20
+    Grenade: 0.20
+    Knife: 0.25
+    Axe: 0.35
+    Sickle: 0.35
+    Sword: 0.35
+    Crowbar: 0.30
+    Stick: 0.35
+    Hammer: 0.40
+    Spanner: 0.40
+    Chain: 0.40
+
+  # --------------------------------------------------------------------------
+  # Lọc HÌNH HỌC (tầng lọc T3) - ĐÃ SỬA LẠI HẲN
+  #
+  # Bản cũ: loại THẲNG mọi hộp > 12% diện tích khung, không xét gì khác.
+  # Vấn đề: luật đó cắt cả vật THẬT. Một con dao giơ gần camera, một khẩu
+  # súng trường nằm ngang khung - đều vượt 12% dễ dàng. Tức là nó đánh đổi
+  # recall để mua precision, đi ngược yêu cầu "không bỏ sót".
+  #
+  # Bản mới: GIỚI HẠN DIỆN TÍCH TỈ LỆ THUẬN VỚI ĐỘ TIN CẬY.
+  # Căn cứ: chẩn đoán trên video thật cho thấy nhiễu bám vào cánh tay / balo
+  # nằm ở conf 0.10-0.30, còn vật thật ở gần camera cho conf cao hơn hẳn.
+  # Nên luật là "càng chắc thì càng được phép to":
+  #
+  #     conf <= conf_lo (0.35)      -> giới hạn CHẶT  (tight_area_pct)
+  #     conf >= bypass_conf (0.65)  -> giới hạn RỘNG  (max_box_area_pct)
+  #     ở giữa                      -> nội suy tuyến tính giữa hai mức
+  #     vượt hard_max_box_area_pct  -> loại, không miễn trừ gì
+  #
+  # Ví dụ với khung 1920x1080:
+  #   cánh tay, conf 0.22, chiếm 23.6%  -> giới hạn 12%  -> LOẠI
+  #   dao giơ gần, conf 0.88, chiếm 23.6% -> giới hạn 35% -> GIỮ
+  # Cùng một cái hộp, hai kết cục khác nhau. Đó là điểm khác bản cũ.
+  #
+  # Nếu vẫn còn sót: nâng tight_area_pct hoặc hạ conf_lo.
+  # Nếu vẫn còn báo nhầm: hạ tight_area_pct hoặc nâng bypass_conf.
+  # --------------------------------------------------------------------------
+  geometry:
+    # Giới hạn CHẶT, áp dụng khi mô hình không chắc (conf <= conf_lo).
+    # 12% là giá trị của bản cũ - nay chỉ còn áp cho detection yếu.
+    tight_area_pct: 12.0
+    tight_area_pct_suspect: 8.0
+    # Giới hạn RỘNG, áp dụng khi conf >= bypass_conf.
+    # Vũ khí thật được nới rộng hơn vật nghi vấn, vì bỏ sót vũ khí tốn kém
+    # hơn nhiều so với báo nhầm một cái búa.
+    max_box_area_pct: 35.0
+    max_box_area_pct_suspect: 18.0
+    # Hai mốc conf để nội suy
+    conf_lo: 0.35
+    bypass_conf: 0.65
+    # Giới hạn CỨNG: trên mức này chắc chắn là nhiễu bám vào nền / thân
+    # người, dù conf bao nhiêu cũng loại.
+    hard_max_box_area_pct: 65.0
+    # Hộp nhỏ hơn mức này là nhiễu điểm, loại không điều kiện.
+    min_box_area_pct: 0.02
+    # Tỉ lệ cạnh. Có miễn trừ theo conf vì dao/kiếm nhìn theo cạnh thì rất
+    # dài và mảnh thật.
+    max_aspect_ratio: 14.0
+
+  # Hiển thị: Nhãn tiếng Việt và mã màu BGR
+  display:
+    Axe:
+      vi: "RIU CHAT (AXE)"
+      color: [0, 140, 255]
+    Sickle:
+      vi: "LIEM/RUA (SICKLE)"
+      color: [0, 215, 255]
+    Sword:
+      vi: "KIEM/MA TAU (SWORD)"
+      color: [255, 0, 128]
+    Crowbar:
+      vi: "XA BENG (CROWBAR)"
+      color: [205, 90, 106]
+    Knife:
+      vi: "DAO (KNIFE)"
+      color: [0, 165, 255]
+    Pistol:
+      vi: "SUNG NGAN (PISTOL)"
+      color: [0, 0, 255]
+    Long_gun:
+      vi: "SUNG TRUONG (LONG GUN)"
+      color: [0, 0, 200]
+    Grenade:
+      vi: "LUU DAN (GRENADE)"
+      color: [0, 69, 255]
+    Stick:
+      vi: "GAY (STICK)"
+      color: [0, 255, 255]
+    Hammer:
+      vi: "BUA (HAMMER)"
+      color: [30, 105, 210]
+    Spanner:
+      vi: "CO LE (SPANNER)"
+      color: [180, 105, 255]
+    Chain:
+      vi: "XICH SAT (CHAIN)"
+      color: [255, 255, 0]
+
+
+# ------------------------------------------------------------------------------
+# 2. CẤU HÌNH DATASET
+# ------------------------------------------------------------------------------
+dataset:
+  yaml_path: "data/weapon_8cls.yaml"
+  num_classes: 8
+  classes:
+    - Axe
+    - Sickle
+    - Sword
+    - Crowbar
+    - Knife
+    - Pistol
+    - Long_gun
+    - Grenade
+
+
+# ------------------------------------------------------------------------------
+# 3. THAM SỐ HUẤN LUYỆN - ĐẶT THEO HƯỚNG KHOANH VÙNG CHÍNH XÁC
+#
+# Bốn thay đổi so với bản trước, theo thứ tự mức tác động:
+#
+#  imgsz 640 -> 960   Đòn mạnh nhất cho vật nhỏ ở xa. Một con dao 25 px trong
+#                     khung 1080p chỉ còn ~15 px sau khi co về 640, gần như
+#                     không còn đặc trưng để hồi quy hộp. Ở 960 nó còn ~22 px.
+#                     Đổi lại: chậm hơn ~2,2 lần và tốn VRAM hơn.
+#
+#  box 7.5 -> 9.0     Trọng số loss hồi quy hộp. Đây chính là núm xoay trực
+#                     tiếp cho "khoanh vùng chính xác". Nâng box làm mô hình
+#                     chịu phạt nặng hơn khi hộp lệch, kéo mAP50-95 lên.
+#
+#  mixup 0.15 -> 0.0  Mixup trộn hai ảnh trong suốt và giữ hộp của CẢ HAI.
+#                     Mô hình buộc phải đoán hộp cho vật bị chồng mờ -> biên
+#                     hộp học được nhoè đi. Có lợi cho phân lớp, có HẠI cho
+#                     độ sát của hộp. Ưu tiên khoanh vùng thì phải tắt.
+#
+#  copy_paste 0.3 -> 0.1
+#                     Dataset này không có mask phân vùng, nên copy_paste dán
+#                     theo hộp chữ nhật, tạo mép cứng giả và hộp hơi lệch.
+#                     Giữ một ít để đa dạng nền, không nhiều hơn.
+#
+#  degrees/shear/perspective GIỮ Ở 0
+#                     Đây là chủ ý, không phải bỏ quên. Quay ảnh làm hộp bao
+#                     song song trục phình to ra: một con dao mảnh quay 30 độ
+#                     có hộp rộng gần gấp đôi vật thật. Nhãn thành sai, và đó
+#                     đúng là cái đang cần chữa.
+# ------------------------------------------------------------------------------
+training:
+  model_weights: "yolo26s.pt"
+  epochs: 80
+  batch_size: 4         # giảm từ 8 vì imgsz tăng lên 960. Nếu GPU còn dư
+                        # VRAM thì nâng lên 6 hoặc 8 để train nhanh hơn.
+  imgsz: 960
+  device: "0"
+  workers: 4
+  optimizer: "AdamW"
+  lr0: 0.0015           # giảm theo batch (AdamW: lr tỉ lệ với batch size)
+  lrf: 0.01
+  cos_lr: true          # giảm lr theo cosine -> hội tụ êm hơn ở cuối, hộp ổn định hơn
+  warmup_epochs: 3
+  patience: 25
+  save_period: 10
+  close_mosaic: 20      # 20 epoch cuối tắt mosaic, kết thúc trên ảnh THẬT
+
+  # Trọng số loss
+  box: 9.0              # nâng từ 7.5 - núm xoay chính cho độ sát của hộp
+  cls: 0.7              # nâng từ 0.5 vì cần phạt nặng việc phân loại nhầm lớp
+  dfl: 1.5              # YOLO26 đã bỏ nhánh DFL nên tham số này gần như vô
+                        # hiệu; giữ lại để chạy được cả với yolo11/yolo8.
+
+  # Tăng cường dữ liệu
+  scale: 0.5            # giữ - buộc mô hình thấy cùng vật ở nhiều cự ly
+  mosaic: 1.0           # giữ - ghép 4 ảnh, vật tự nhiên nhỏ lại
+  mixup: 0.0            # TẮT - xem lý do ở đầu mục 3
+  copy_paste: 0.1       # giảm từ 0.3
+  fliplr: 0.5
+  degrees: 0.0          # cố ý để 0 - xem lý do ở đầu mục 3
+  shear: 0.0
+  perspective: 0.0
+  translate: 0.1
+  hsv_h: 0.015
+  hsv_s: 0.6
+  hsv_v: 0.4
+
+
+# ------------------------------------------------------------------------------
+# 4. PIPELINE TRINH SÁT THỜI GIAN THỰC (MULTI-THREADED RUNTIME)
+# ------------------------------------------------------------------------------
+pipeline:
+  frame_queue_size: 2
+  event_queue_size: 50
+  input_source: 0
+  save_dir: "storage/alerts"
+  db_path: "storage/logs/security_events.db"
+
+# ------------------------------------------------------------------------------
+# 5. THAM SỐ SUY LUẬN
+#
+# CẢNH BÁO VỀ BẢN CŨ: iou_threshold 0.45 và half true được khai ở đây nhưng
+# detector.py KHÔNG hề truyền vào predict(). Hai dòng đó là code chết, hệ
+# thống thực tế đang chạy iou = 0.7 (mặc định của ultralytics). Nay đã nối
+# thật. Và đáng chú ý: nếu lúc đó nối đúng 0.45 thì recall sẽ GIẢM, vì NMS
+# với iou thấp xoá bớt hộp chồng nhau - hai người đứng cạnh nhau mỗi người
+# một con dao sẽ bị bỏ mất một. Nên giữ 0.70.
+# ------------------------------------------------------------------------------
+inference:
+  model_path: "weights/best.pt"
+  imgsz: 960            # khớp với imgsz lúc train. Lệch kích thước giữa train
+                        # và suy luận là nguyên nhân sót vật nhỏ rất thường gặp.
+  conf_threshold: null  # null = dùng ngưỡng riêng từng lớp ở mục 1.
+                        # Điền một số vào đây sẽ ÉP CHUNG và vô hiệu hoá bảng đó.
+  iou_threshold: 0.45   # NMS: 0.45 loại bỏ các hộp bao trùng lấn đa nhãn
+  max_det: 100
+  agnostic_nms: true    # true = NMS đa lớp: ngăn việc 1 khẩu súng bị dán nhãn vừa là súng vừa là mã tấu
+  device: "0"
+  half: true            # FP16 - nhanh hơn ~30% trên GPU, sai số không đáng kể
+  augment: false        # TTA. Bật thì recall + độ sát hộp tăng, chậm ~3 lần.
+                        # Nên bật khi quét ảnh/video, tắt khi chạy camera trực tiếp.
+
+tracking:
+  track_high_thresh: 0.50
+  track_low_thresh: 0.15
+  new_track_thresh: 0.35
+  track_buffer: 30
+  # ĐỪNG SỬA: ByteTrack dùng cost = 1 - IoU và điều kiện cost <= match_thresh.
+  # Đây là ngữ nghĩa gốc, đúng. match_thresh 0.80 tương đương IoU >= 0.20.
+  match_thresh: 0.80
+
+alert_system:
+  min_hits: 4
+  min_peak_conf: 0.55
+  strong_hits: 6
+  sliding_window_size: 8

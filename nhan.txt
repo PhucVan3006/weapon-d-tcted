@@ -1,0 +1,37 @@
+Bộ 1: Weapon Dataset Conversion (CVAI - 18.100 ảnh) gồm 8 nhãn:
+
+Axe: Rìu chặt
+
+Sickle: Liềm, rựa quắm / rựa cong
+
+Sword: Kiếm, đao, mã tấu dài
+
+Crowbar: Xà beng
+
+Knife: Dao nhọn, dao găm
+
+Pistol: Súng ngắn / súng lục
+
+Long_gun: Súng trường, súng săn (AK, M16, Shotgun...)
+
+Grenade: Lựu đạn
+
+Bộ 2: Omnisight-ATM-Skimmer (18.100 ảnh) gồm 9 nhãn:
+
+stick: Gậy (gậy gỗ, gậy sắt, gậy bóng chày)
+
+hammer: Búa
+
+crowbar: Xà beng (trùng với Crowbar ở Bộ 1)
+
+spanner: Cờ lê sắt cỡ lớn / mỏ lết
+
+chain: Dây xích sắt
+
+knife: Dao (trùng với Knife ở Bộ 1)
+
+gun: Súng (chủ yếu là súng ngắn, trùng với Pistol ở Bộ 1)
+
+wire: Dây điện / dây cáp (Nhãn phụ trợ ATM - nên loại bỏ)
+
+suspicious-human-posses: Dáng người khả nghi (Nhãn phụ trợ - nên loại bỏ)
